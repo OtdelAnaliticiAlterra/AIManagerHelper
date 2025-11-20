@@ -1,8 +1,8 @@
 import json
-from pprint import pprint
 import concurrent.futures
 import pandas
 from openai import OpenAI
+
 from conf import Config
 
 client = OpenAI(api_key=Config.DEEP_SEEK_API_KEY, base_url="https://api.deepseek.com")
@@ -63,6 +63,30 @@ def process_chunk(args):
     return process_invoice_with_deepseek(request_products, chunk)
 
 
+def processing_data(data: list[dict]):
+    # Объединяем список всех найденных продуктов
+    found_products = []
+    for obj in data:
+        found_products.extend(obj['found_products'])
+
+    found_products_df = pandas.DataFrame(found_products)  # **
+
+    # Отбираем продукты с максимальной точностью
+    only_max_confidence_data = found_products_df.loc[found_products_df.groupby('product_code')['confidence'].idxmax()]
+
+    results = {
+        'found_products_with_best_confidence': only_max_confidence_data.to_dict(orient='records'),
+        'all_found_products': found_products,
+        'responses': data.copy()
+    }
+
+    with open("result.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=4)
+
+    only_max_confidence_data.to_excel('found_products_with_best_confidence.xlsx', index=False)
+    found_products_df.to_excel('all_found_products.xlsx', index=False)
+
+
 def main():
     nk_data = get_nk()
 
@@ -84,12 +108,9 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=Config.MAX_WORKERS) as executor:
         results = list(executor.map(process_chunk, chunk_args))
 
-    print("Обработка завершена!")
-    pprint(results)
-
-    # Сохраняем результаты
-    with open("result.json", "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=4)
+    print("Обрабатываем данные!")
+    processing_data(results)
+    print('--- COMPLETE ---')
 
 
 if __name__ == '__main__':

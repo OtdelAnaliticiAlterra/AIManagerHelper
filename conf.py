@@ -5,7 +5,7 @@ load_dotenv(find_dotenv())
 
 
 class Config:
-    MAX_WORKERS: int = 8
+    MAX_WORKERS: int = 14
     TABLE_LEN_PARTITION: int = 1400
 
     DEEP_SEEK_API_KEY: str = os.getenv('DEEPSEEK_API_KEY')
