@@ -1,11 +1,13 @@
 import json
 import concurrent.futures
+import os.path
+
 import pandas
 from openai import OpenAI
 
-from conf import Config
+from conf import CONFIG
 
-client = OpenAI(api_key=Config.DEEP_SEEK_API_KEY, base_url="https://api.deepseek.com")
+client = OpenAI(api_key=CONFIG.DEEP_SEEK_API_KEY, base_url="https://api.deepseek.com")
 
 
 def process_invoice_with_deepseek(request_products: str, product_catalog: str):
@@ -15,7 +17,7 @@ def process_invoice_with_deepseek(request_products: str, product_catalog: str):
             messages=[
                 {
                     "role": "system",
-                    "content": Config.SYSTEM_PROMPT
+                    "content": CONFIG.SYSTEM_PROMPT
                 },
                 {
                     "role": "user",
@@ -30,10 +32,10 @@ def process_invoice_with_deepseek(request_products: str, product_catalog: str):
                         Найди соответствия и верни в указанном JSON формате.""",
                 }
             ],
-            max_tokens=Config.MAX_TOKENS,
+            max_tokens=CONFIG.MAX_TOKENS,
             temperature=0.1,
             response_format={"type": "json_object"},
-            stream=Config.STREAM
+            stream=CONFIG.STREAM
         )
 
         result_json = json.loads(response.choices[0].message.content)
@@ -44,14 +46,14 @@ def process_invoice_with_deepseek(request_products: str, product_catalog: str):
 
 
 def get_nk():
-    nk_data = pandas.read_excel(Config.NK_FILE_PATH)
+    nk_data = pandas.read_excel(os.path.join(CONFIG.WORK_DIR, CONFIG.NK_FILE_PATH))
 
     result = []
     part = 0
     while part < len(nk_data):
-        data_piece = nk_data[part:part + Config.TABLE_LEN_PARTITION].to_markdown()
+        data_piece = nk_data[part:part + CONFIG.TABLE_LEN_PARTITION].to_markdown()
         result.append(data_piece)
-        part += Config.TABLE_LEN_PARTITION
+        part += CONFIG.TABLE_LEN_PARTITION
 
     return result
 
@@ -72,7 +74,7 @@ def processing_data(data: list[dict]):
     found_products_df = pandas.DataFrame(found_products)  # **
 
     # Отбираем продукты с максимальной точностью
-    only_max_confidence_data = found_products_df.loc[found_products_df.groupby('product_code')['confidence'].idxmax()]
+    only_max_confidence_data = found_products_df.loc[found_products_df.groupby('requested_item')['confidence'].idxmax()]
 
     results = {
         'found_products_with_best_confidence': only_max_confidence_data.to_dict(orient='records'),
@@ -80,11 +82,12 @@ def processing_data(data: list[dict]):
         'responses': data.copy()
     }
 
-    with open("result.json", "w", encoding="utf-8") as f:
+    with open(os.path.join(CONFIG.WORK_DIR, "result.json"), "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
 
-    only_max_confidence_data.to_excel('found_products_with_best_confidence.xlsx', index=False)
-    found_products_df.to_excel('all_found_products.xlsx', index=False)
+    only_max_confidence_data.to_excel(os.path.join(CONFIG.WORK_DIR, 'found_products_with_best_confidence.xlsx'),
+                                      index=False)
+    found_products_df.to_excel(os.path.join(CONFIG.WORK_DIR, 'all_found_products.xlsx'), index=False)
 
 
 def main():
@@ -105,12 +108,28 @@ def main():
     chunk_args = [(chunk, request_products, i) for i, chunk in enumerate(nk_data)]
 
     # Многопоточная обработка
-    with concurrent.futures.ThreadPoolExecutor(max_workers=Config.MAX_WORKERS) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=CONFIG.MAX_WORKERS) as executor:
         results = list(executor.map(process_chunk, chunk_args))
 
     print("Обрабатываем данные!")
     processing_data(results)
     print('--- COMPLETE ---')
+
+
+def __main():
+    nk_data = pandas.read_excel(os.path.join(CONFIG.WORK_DIR, CONFIG.NK_FILE_PATH)).to_markdown()
+
+    request_products = """
+    Анкер распорный М8х70	шт	83
+    Газобетон 200х250х625	шт	427 / м2	13,35
+    Клей для ячеистого бетона	кг	650
+    Сетка оцинкованная фЗВр-І яч.50*50 шириной 200мм	м.п	124,52
+    Кирпич силикатный СУРПо -М100/F25/2,0 по ГОСТ 379-2015	шт	217
+    Утеплитель экструдированный пенополистирол 50мм	м2	200
+    """
+    data = process_invoice_with_deepseek(request_products, nk_data)
+
+    print(data)
 
 
 if __name__ == '__main__':
