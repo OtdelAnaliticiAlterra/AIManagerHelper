@@ -1,3 +1,4 @@
+import enum
 import os
 from pathlib import Path
 
@@ -7,7 +8,19 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
 
+class Region(enum.Enum):
+    BRN: str = 'Филиал Барнаул'
+    BIY: str = 'Филиал Бийск'
+    MAY: str = 'Филиал Майма'
+    CB: str = 'Центральный офис'
+    VIB: str = 'Филиал Выбор'
+
+    ANY: str = 'ANY'
+
+
 class Config:
+    PREPROCESSING_REQUEST: bool = True
+
     MAX_WORKERS: int = 10
     TABLE_LEN_PARTITION: int = 1000
 
