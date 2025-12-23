@@ -65,11 +65,42 @@ def process_chunk(args):
     return process_invoice_with_deepseek(request_products, chunk)
 
 
-def processing_data(data: list[dict]):
+def processing_data(data: list[dict]) -> None:
+    products = []
+    for obj in data:
+        try:
+            products.extend(obj["found_products"])
+            products.extend(obj["not_found_items"])
+        except Exception as e:
+            print(e)
+            print('=' * 20 + ' ERROR ' + '=' * 20)
+    products_df = pandas.DataFrame(products)
+
+    only_max_confidence_data = products_df.loc[products_df.groupby('requested_item')['confidence'].idxmax()]
+
+    results = {
+        'found_products_with_best_confidence': only_max_confidence_data.to_dict(orient='records'),
+        'all_found_products': products,
+        'responses': data.copy()
+    }
+
+    with open(os.path.join(CONFIG.WORK_DIR, "result.json"), "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=4)
+
+    only_max_confidence_data.to_excel(os.path.join(CONFIG.WORK_DIR, 'products_with_best_confidence.xlsx'),
+                                      index=False)
+    products_df.to_excel(os.path.join(CONFIG.WORK_DIR, 'all_products.xlsx'), index=False)
+
+
+def _processing_data(data: list[dict]):
     # Объединяем список всех найденных продуктов
     found_products = []
+    not_processed_data = []
     for obj in data:
-        found_products.extend(obj['found_products'])
+        if obj.get("found_products", None) is not None:
+            found_products.extend(obj['found_products'])
+        else:
+            not_processed_data.extend(obj)
 
     found_products_df = pandas.DataFrame(found_products)  # **
 
@@ -94,12 +125,25 @@ def main():
     nk_data = get_nk()
 
     request_products = """
-    Анкер распорный М8х70	шт	83
-    Газобетон 200х250х625	шт	427 / м2	13,35
-    Клей для ячеистого бетона	кг	650
-    Сетка оцинкованная фЗВр-І яч.50*50 шириной 200мм	м.п	124,52
-    Кирпич силикатный СУРПо -М100/F25/2,0 по ГОСТ 379-2015	шт	217
-    Утеплитель экструдированный пенополистирол 50мм	м2	200
+    Линолеум шир.3м.- 6м.п.(18м2)
+    Плинтус 2,5м – 9шт.
+    Угол внутр. – 4шт.
+    Угол наруж. – 2шт.
+    Заглушки 4шт.
+    Соединитель – 8шт.
+    Дюбель-гвоздь 55мм- 100шт. - 200 шт. Шлифовка
+    Профиль направляющий ПН-27*28 – 20шт.
+    Профиль стоечный ПС 60*27 – 70шт.
+    Саморез м/м 16мм – 1000шт.
+    Подвес прямой – 200шт.
+    
+    Помещение весовой:
+    Линолеум шир.3м.- 7м.п.(21м2) 3,5 м ширине
+    Плинтус 2,5м – 14шт.
+    Угол внутр. – 12шт.
+    Угол наруж. – 6шт.
+    Заглушки – 6шт.
+    Соединитель – 4шт.
     """
 
     print(f"Всего чанков для обработки: {len(nk_data)}")
@@ -114,22 +158,6 @@ def main():
     print("Обрабатываем данные!")
     processing_data(results)
     print('--- COMPLETE ---')
-
-
-def __main():
-    nk_data = pandas.read_excel(os.path.join(CONFIG.WORK_DIR, CONFIG.NK_FILE_PATH)).to_markdown()
-
-    request_products = """
-    Анкер распорный М8х70	шт	83
-    Газобетон 200х250х625	шт	427 / м2	13,35
-    Клей для ячеистого бетона	кг	650
-    Сетка оцинкованная фЗВр-І яч.50*50 шириной 200мм	м.п	124,52
-    Кирпич силикатный СУРПо -М100/F25/2,0 по ГОСТ 379-2015	шт	217
-    Утеплитель экструдированный пенополистирол 50мм	м2	200
-    """
-    data = process_invoice_with_deepseek(request_products, nk_data)
-
-    print(data)
 
 
 if __name__ == '__main__':

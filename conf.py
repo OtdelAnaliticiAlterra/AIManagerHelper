@@ -33,8 +33,13 @@ class Config:
             with open(self.SYSTEM_PROMPT_FILE_PATH, 'r', encoding='utf-8') as f:
                 self.__system_prompt = f.read()
             self.__system_prompt += f"""
-            ## Пример сопоставленных номенклатур
+            ---
+            ## Пример сопоставленных номенклатур в табличном виде 
             {pandas.read_excel(os.path.join(self.WORK_DIR, 'Сопоставления очищенные.xlsx')).to_markdown()}
+            
+            ВАЖНО! ЭТО ЛИШЬ ПРИМЕР УЖЕ СОПОСТАВЛЕННОЙ НОМЕНКЛАТУРЫ! 
+            НЕ ПОДТЯГИВАЙ ДАННЫЕ ДЛЯ СОПОСТАВЛЕНИЯ ИЗ ЭТОГО СПИСКА!
+            ---
             """
         return self.__system_prompt
 
