@@ -267,7 +267,7 @@ def processing_request() -> str:
 def main():
     start = datetime.datetime.now()
 
-    nk_data = get_nk(Region.BRN)
+    nk_data = get_nk(CONFIG.REGION)
 
     if CONFIG.PREPROCESSING_REQUEST:
         print('--- Идет обработка запроса ---')

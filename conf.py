@@ -19,7 +19,9 @@ class Region(enum.Enum):
 
 
 class Config:
-    PREPROCESSING_REQUEST: bool = True
+    REGION: Region = Region.BRN
+
+    PREPROCESSING_REQUEST: bool = False
 
     MAX_WORKERS: int = 10
     TABLE_LEN_PARTITION: int = 1000
